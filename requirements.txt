@@ -1,4 +1,4 @@
-# Direct dependencies, pinned to the versions the notebooks were last run with (Python 3.12).
+# Direct dependencies, pinned to the versions the pipeline was tested with (Python 3.12).
 numpy==2.5.2
 pandas==3.0.5
 requests==2.34.2
@@ -10,6 +10,14 @@ rasterio==1.5.1
 xarray==2026.7.0
 netCDF4==1.7.4
 scipy==1.18.1
+pyyaml==6.0.3
+
+# model setup (scripts/build_models.py --steps setup)
+hydromt==0.10.1
+hydromt_sfincs==1.2.2
+
+# notebooks and tests
 matplotlib==3.11.1
 contextily==1.7.1
 ipykernel==7.3.0
+pytest

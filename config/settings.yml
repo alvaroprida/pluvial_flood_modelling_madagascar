@@ -1,24 +1,50 @@
-# Run settings shared by notebooks and scripts.
-# Values mirror the configuration cell of notebooks/01_input_preprocessing.ipynb;
-# they will be read from here once that code moves to src/mdg_pluvial/.
+# Run settings for the per-basin pipeline (scripts/build_models.py).
+# Relative paths are resolved against the repository root. Any path can be overridden with an
+# environment variable: MDG_DATA_DIR, MDG_CACHE_DIR, MDG_BASINS_DIR, MDG_MODELS_DIR,
+# MDG_HYDROBASINS, MDG_GPM_DAILY.
 
 paths:
   data_dir: data
-  raw_dir: data/raw
-  processed_dir: data/processed
-  output_dir: outputs
+  cache_dir: data/cache         # downloads shared by every basin (FABDEM tiles, GCN250 globals)
+  basins_dir: data/basins       # per-basin inputs: data/basins/<basin_id>/
+  models_dir: models            # per-basin SFINCS models: models/<basin_id>/
 
-behaviour:
-  overwrite: false
-  make_figures: true
+local_inputs:                   # files that are not downloaded - see data/README.md
+  hydrobasins: data/raw/hybas_af_lev07_v1c_mdg.geojson
+  gpm_daily: data/raw/gpm_daily_precipitation_pp.nc
 
 domain:
-  min_catchment_area_km2: 50.0
-  aoi_buffer_deg: 0.10
-  area_crs: EPSG:32738      # UTM 38S, area computations only
-  work_crs: EPSG:4326       # CRS of every raster written
+  min_catchment_area_km2: 50.0  # drops offshore islets; keeps Nosy Be (~320) and Sainte Marie (~150)
+  buffer_deg: 0.02              # halo around each basin's bounding box (~2 km)
+  area_crs: EPSG:32738          # UTM 38S, area computations only
+  work_crs: EPSG:4326           # CRS of every input raster
 
 static_data:
-  gcn250_arcs: [ARCII]
-  dem_overview_res_deg: 0.0025
+  gcn250_arcs: [ARCII]          # add ARCI / ARCIII for the antecedent-moisture sensitivity runs
   soilgrids_depths: [0-5cm, 5-15cm, 15-30cm, 30-60cm, 60-100cm]
+  soilgrids_weights: [5, 10, 15, 30, 40]   # layer thickness in cm
+
+rainfall:
+  return_periods: [2, 5, 10, 25, 50, 100]
+  season_start_month: 7         # cyclone-season year starts 1 July
+  basin_statistic: median       # how the per-cell design depths are reduced to one basin value
+  hyetograph_duration_h: 24
+  hyetograph_step_min: 30
+  dd_exponent: 0.3333333        # P(t) = P(24h) * (t/24)^n - uncalibrated, see docs/methodology.md
+  plausible_peak_mm_hr: 150     # a warning is logged above this peak intensity
+
+model:
+  res: 50                       # SFINCS grid resolution (m)
+  crs: utm                      # UTM zone picked per basin by HydroMT
+  nr_subgrid_pixels: 2          # must be even; 50 m cells / 2 = 25 m pixels, close to FABDEM's ~30 m
+  design_return_period: 100     # hyetograph used as the model forcing
+  antecedent_moisture: avg      # SCS-CN condition passed to HydroMT
+  gcn250_arc: ARCII             # curve-number layer used by the model (must be in gcn250_arcs)
+  outflow_boundaries: true      # let water leave the domain through its edge cells
+  tref: "2000-01-01 00:00"
+  drain_time_h: 12              # simulated time after the end of the rainfall
+
+http:
+  user_agent: mdg-pluvial/0.1
+  timeout_s: 180
+  max_retries: 5

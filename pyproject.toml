@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mdg_pluvial"
+version = "0.1.0"
+description = "Per-basin pluvial flood modelling for Madagascar with SFINCS"
+readme = "README.md"
+requires-python = ">=3.10"
+# Unpinned here; requirements.txt pins the versions the pipeline was tested with.
+dependencies = [
+    "numpy", "pandas", "requests", "geopandas", "pyproj", "shapely>=2", "rasterio",
+    "xarray", "netCDF4", "pyyaml", "hydromt_sfincs",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
