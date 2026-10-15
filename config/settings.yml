@@ -13,6 +13,8 @@ local_inputs:                   # files that are not downloaded - see data/READM
   hydrobasins: data/raw/hybas_af_lev07_v1c_mdg.geojson
   gpm_daily: data/raw/gpm_daily_precipitation_pp.nc
 
+qc_figures: true                # PNGs in data/basins/<id>/figures/ and models/<id>/figures/
+
 domain:
   min_catchment_area_km2: 50.0  # drops offshore islets; keeps Nosy Be (~320) and Sainte Marie (~150)
   buffer_deg: 0.02              # halo around each basin's bounding box (~2 km)
@@ -41,6 +43,8 @@ model:
   antecedent_moisture: avg      # SCS-CN condition passed to HydroMT
   gcn250_arc: ARCII             # curve-number layer used by the model (must be in gcn250_arcs)
   outflow_boundaries: true      # let water leave the domain through its edge cells
+  min_active_elevation: 0.01    # cells below this (m) are inactive: FABDEM sets the sea to exactly 0 m.
+                                # null keeps every cell inside the polygon active
   tref: "2000-01-01 00:00"
   drain_time_h: 12              # simulated time after the end of the rainfall
 

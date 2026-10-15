@@ -36,8 +36,10 @@ target grid is known.
 - UTM grid (zone chosen per basin by HydroMT), 50 m cells.
 - Subgrid tables with 2 pixels per cell (25 m), close to FABDEM's resolution. HydroMT requires
   an even number of pixels.
-- Active cells: those inside the basin polygon. The basin edge is an outflow boundary. Since
-  the edge is mostly a drainage divide, water leaves in practice through the outlet.
+- Active cells: those inside the basin polygon and above `model.min_active_elevation` (0.01 m).
+  FABDEM sets the sea to exactly 0 m, so a polygon drawn over the coast does not model the sea
+  as land. The basin edge (including the coastline) is an outflow boundary. Since an inland
+  edge is mostly a drainage divide, water leaves in practice through the outlet.
 - Forcing: the design hyetograph for `model.design_return_period` (100 years by default), applied
   uniformly over the basin, followed by `model.drain_time_h` hours without rain.
 
@@ -51,6 +53,17 @@ target grid is known.
 - The alternating block shape assumes a single central peak. Multi-band cyclones are better
   represented by observed events.
 - Design rainfall is spatially uniform over each basin.
+- GCN250 has no data on some coastal cells. HydroMT turns these into zero retention (full
+  runoff), which is conservative; in a coastal test area this affected 1.7% of active cells.
+
+## Quality control
+
+Every basin gets QC figures (switch off with `qc_figures: false`):
+
+- `data/basins/<id>/figures/`: one per input (topography, land cover, curve number, soil
+  groups, design rainfall), each with the basin outline and the distribution inside the basin.
+- `models/<id>/figures/model_overview.png`: active mask and outflow boundary, subgrid
+  elevation, infiltration capacity, and the rainfall forcing over the whole run.
 
 ## Validation
 

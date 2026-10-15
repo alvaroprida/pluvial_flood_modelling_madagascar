@@ -23,6 +23,9 @@ agricultural or urban areas). For each basin, in series or in parallel:
 2. **setup**: build the SFINCS model in `models/<basin_id>/` (UTM grid, subgrid topography and
    roughness, curve-number infiltration, design-storm rainfall).
 
+Each step also writes QC figures: one per input in `data/basins/<basin_id>/figures/`, and a
+model overview in `models/<basin_id>/figures/model_overview.png`.
+
 Downloads that several basins share (FABDEM tiles, the global GCN250 grid) go to `data/cache/`
 and are fetched only once. Every step skips outputs that already exist, so an interrupted batch
 can simply be relaunched.

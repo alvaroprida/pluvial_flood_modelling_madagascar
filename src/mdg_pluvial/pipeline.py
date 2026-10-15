@@ -38,6 +38,7 @@ from .curve_number import SOURCE as GCN250_SOURCE
 from .curve_number import extract_curve_number
 from .io import configure_http
 from .landcover import VITO_MAPPING_URL, VITO_URL, extract_landcover, landcover_mapping
+from .qc import plot_input_figures, plot_model_figures
 from .rainfall import basin_design_rainfall
 from .soils import SOURCE as SOILGRIDS_SOURCE
 from .soils import extract_soils
@@ -142,6 +143,15 @@ def prepare_inputs(basin_id: str, geometry, settings: Settings, *,
     return bdir
 
 
+def _qc(plot: Callable[[], object]) -> None:
+    """Draw QC figures; a plotting failure is logged but never fails the basin."""
+    try:
+        plot()
+    except Exception:
+        log.warning("QC figures failed (the basin outputs are unaffected):\n%s",
+                    traceback.format_exc())
+
+
 def process_basin(basin_id: str, geometry_wkb: bytes, settings_path: Optional[str],
                   steps: Sequence[str], overwrite: bool = False) -> dict:
     """Run the requested *steps* for one basin. Never raises: errors are returned."""
@@ -161,12 +171,19 @@ def process_basin(basin_id: str, geometry_wkb: bytes, settings_path: Optional[st
     result = {"basin_id": basin_id, "status": "ok", "error": None}
     try:
         log.info("==== basin %s: steps %s", basin_id, list(steps))
+        qc = settings.raw.get("qc_figures", True)
         if "inputs" in steps:
             prepare_inputs(basin_id, geometry, settings, overwrite=overwrite)
+            if qc:
+                _qc(lambda: plot_input_figures(
+                    bdir, model_rp=settings.model.get("design_return_period", 100),
+                    overwrite=overwrite))
         if "setup" in steps:
             from .sfincs_setup import build_sfincs_model
-            build_sfincs_model(bdir, settings.model_dir(basin_id), geometry,
-                               model_cfg=settings.model, overwrite=overwrite)
+            model_dir = build_sfincs_model(bdir, settings.model_dir(basin_id), geometry,
+                                           model_cfg=settings.model, overwrite=overwrite)
+            if qc:
+                _qc(lambda: plot_model_figures(model_dir, overwrite=overwrite))
     except Exception as exc:
         result.update(status="failed", error=f"{type(exc).__name__}: {exc}")
         log.error("basin %s failed:\n%s", basin_id, traceback.format_exc())

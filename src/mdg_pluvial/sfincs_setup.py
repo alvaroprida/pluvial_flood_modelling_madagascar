@@ -72,7 +72,9 @@ def build_sfincs_model(basin_dir: Path, model_dir: Path, geometry, *, model_cfg:
         sf.setup_grid_from_region(region={"geom": region}, res=model_cfg.get("res", 50),
                                   crs=model_cfg.get("crs", "utm"))
         sf.setup_dep(datasets_dep=[{"elevtn": "fabdem"}])
-        sf.setup_mask_active(mask=region, reset_mask=True)
+        # a polygon drawn over the coast would otherwise model the sea as flat land at 0 m
+        sf.setup_mask_active(mask=region, zmin=model_cfg.get("min_active_elevation", 0.01),
+                             reset_mask=True)
         if model_cfg.get("outflow_boundaries", True):
             # without include_mask HydroMT sets no boundary cells at all; the basin
             # polygon makes its whole edge an outflow boundary. The edge is a drainage
