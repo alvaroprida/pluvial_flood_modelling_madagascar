@@ -1,0 +1,24 @@
+# Run settings shared by notebooks and scripts.
+# Values mirror the configuration cell of notebooks/01_input_preprocessing.ipynb;
+# they will be read from here once that code moves to src/mdg_pluvial/.
+
+paths:
+  data_dir: data
+  raw_dir: data/raw
+  processed_dir: data/processed
+  output_dir: outputs
+
+behaviour:
+  overwrite: false
+  make_figures: true
+
+domain:
+  min_catchment_area_km2: 50.0
+  aoi_buffer_deg: 0.10
+  area_crs: EPSG:32738      # UTM 38S, area computations only
+  work_crs: EPSG:4326       # CRS of every raster written
+
+static_data:
+  gcn250_arcs: [ARCII]
+  dem_overview_res_deg: 0.0025
+  soilgrids_depths: [0-5cm, 5-15cm, 15-30cm, 30-60cm, 60-100cm]

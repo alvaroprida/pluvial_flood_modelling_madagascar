@@ -1,0 +1,10 @@
+# Conda alternative to the venv route described in README.md.
+# Package pins live in requirements.txt so both routes resolve to the same versions.
+name: mdg_pluvial
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - -r requirements.txt

@@ -1,0 +1,58 @@
+# ---------------------------------------------------------------- data & outputs
+# Large or derived files are never committed; see data/README.md to rebuild them.
+data/**
+!data/**/
+!data/README.md
+!data/**/.gitkeep
+outputs/**
+!outputs/.gitkeep
+models/**
+!models/templates/
+!models/templates/**
+
+# Geospatial / model formats, wherever they appear
+*.tif
+*.tiff
+*.vrt
+*.nc
+*.zip
+*.gpkg
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.geojson
+*.parquet
+*.h5
+*.log
+
+# ---------------------------------------------------------------- python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---------------------------------------------------------------- environments
+.venv*/
+venv/
+.env
+
+# ---------------------------------------------------------------- jupyter
+.ipynb_checkpoints/
+
+# ---------------------------------------------------------------- OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ---------------------------------------------------------------- credentials
+.netrc
+.cdsapirc
+*.pem
+*.key

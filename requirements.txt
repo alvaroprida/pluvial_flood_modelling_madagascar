@@ -1,0 +1,15 @@
+# Direct dependencies, pinned to the versions the notebooks were last run with (Python 3.12).
+numpy==2.5.2
+pandas==3.0.5
+requests==2.34.2
+geopandas==1.1.4
+pyogrio==0.13.0
+pyproj==3.7.2
+shapely==2.1.2
+rasterio==1.5.1
+xarray==2026.7.0
+netCDF4==1.7.4
+scipy==1.18.1
+matplotlib==3.11.1
+contextily==1.7.1
+ipykernel==7.3.0
