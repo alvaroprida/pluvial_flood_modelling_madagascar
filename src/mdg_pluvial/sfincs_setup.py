@@ -17,11 +17,15 @@ import pandas as pd
 log = logging.getLogger(__name__)
 
 
-def hyetograph_timeseries(hyetograph_csv: Path, out_csv: Path, tref: pd.Timestamp) -> pd.Timestamp:
+def hyetograph_timeseries(hyetograph_csv: Path, out_csv: Path, tref: pd.Timestamp,
+                          drain_time_h: float = 12) -> pd.Timestamp:
     """Convert a design hyetograph (blocks in mm/hr) to a HydroMT precipitation time series.
 
     Each block's intensity is stamped at the block start and repeated at the block end, so the
-    forcing stays a step function however SFINCS interpolates. Returns the end of the rainfall.
+    forcing stays a step function however SFINCS interpolates. The series then carries zeros
+    to the end of the simulation: SFINCS does not treat the end of the precipitation file as
+    "no rain", and past it the forcing (and so the whole drain period) is undefined.
+    Returns the end of the simulation.
     """
     hyeto = pd.read_csv(hyetograph_csv)
     step = pd.Timedelta(hours=float(hyeto["time_h"].iloc[1] - hyeto["time_h"].iloc[0]))
@@ -30,11 +34,12 @@ def hyetograph_timeseries(hyetograph_csv: Path, out_csv: Path, tref: pd.Timestam
     times = pd.DatetimeIndex(pd.concat([starts, ends]).sort_values().values)
     values = hyeto["intensity_mm_hr"].repeat(2).values
     rain_end = starts.iloc[-1] + step
-    series = pd.Series(list(values) + [0.0], index=times.append(pd.DatetimeIndex([rain_end])),
-                       name="precip")
+    tstop = rain_end + pd.Timedelta(hours=drain_time_h)
+    tail = pd.DatetimeIndex([rain_end, tstop] if tstop > rain_end else [rain_end])
+    series = pd.Series(list(values) + [0.0] * len(tail), index=times.append(tail), name="precip")
     series.index.name = "time"
     series.to_csv(out_csv)
-    return rain_end
+    return tstop
 
 
 def build_sfincs_model(basin_dir: Path, model_dir: Path, geometry, *, model_cfg: dict,
@@ -59,9 +64,8 @@ def build_sfincs_model(basin_dir: Path, model_dir: Path, geometry, *, model_cfg:
     rp = model_cfg.get("design_return_period", 100)
     tref = pd.Timestamp(model_cfg.get("tref", "2000-01-01 00:00"))
     precip_csv = model_dir / f"precip_rp{rp}.csv"
-    rain_end = hyetograph_timeseries(basin_dir / "rainfall" / f"hyetograph_rp{rp}.csv",
-                                     precip_csv, tref)
-    tstop = rain_end + pd.Timedelta(hours=model_cfg.get("drain_time_h", 12))
+    tstop = hyetograph_timeseries(basin_dir / "rainfall" / f"hyetograph_rp{rp}.csv",
+                                  precip_csv, tref, drain_time_h=model_cfg.get("drain_time_h", 12))
     arc = model_cfg.get("gcn250_arc", "ARCII").lower()
 
     hydromt_log = logging.getLogger("mdg_pluvial.hydromt")
@@ -87,9 +91,13 @@ def build_sfincs_model(basin_dir: Path, model_dir: Path, geometry, *, model_cfg:
                          write_dep_tif=True)
         sf.setup_cn_infiltration(cn=f"gcn250_{arc}",
                                  antecedent_moisture=model_cfg.get("antecedent_moisture", "avg"))
+        # dtmaxout = whole run: one window of maxima and cumulative rain/infiltration.
+        # A shorter interval leaves a partial last window whose cumulative fields
+        # SFINCS fills with garbage.
         sf.setup_config(tref=tref.strftime("%Y%m%d %H%M%S"),
                         tstart=tref.strftime("%Y%m%d %H%M%S"),
-                        tstop=tstop.strftime("%Y%m%d %H%M%S"))
+                        tstop=tstop.strftime("%Y%m%d %H%M%S"),
+                        dtmaxout=int((tstop - tref).total_seconds()))
         sf.setup_precip_forcing(timeseries=str(precip_csv))
         sf.write()
     finally:

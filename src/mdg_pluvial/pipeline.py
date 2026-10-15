@@ -1,4 +1,4 @@
-"""Per-basin pipeline: fetch inputs on the fly, then build the SFINCS model.
+"""Per-basin pipeline: fetch inputs on the fly, build, run and post-process the SFINCS model.
 
 Each basin is processed independently, so basins can run in series or in parallel. Every step
 skips work whose output already exists, so an interrupted batch can simply be relaunched.
@@ -15,7 +15,8 @@ Per-basin layout::
     ├── data_catalog.yml
     ├── provenance.json
     └── pipeline.log
-    models/<basin_id>/                          SFINCS model (step "setup")
+    models/<basin_id>/                          SFINCS model ("setup") and raw output ("run")
+    outputs/<basin_id>/                         flood depth map and summary ("postprocess")
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ from .curve_number import SOURCE as GCN250_SOURCE
 from .curve_number import extract_curve_number
 from .io import configure_http
 from .landcover import VITO_MAPPING_URL, VITO_URL, extract_landcover, landcover_mapping
-from .qc import plot_input_figures, plot_model_figures
+from .qc import plot_flood_map, plot_input_figures, plot_model_figures
 from .rainfall import basin_design_rainfall
 from .soils import SOURCE as SOILGRIDS_SOURCE
 from .soils import extract_soils
@@ -47,7 +48,7 @@ from .topography import extract_dem
 
 log = logging.getLogger("mdg_pluvial")
 
-STEPS = ("inputs", "setup")
+STEPS = ("inputs", "setup", "run", "postprocess")
 
 
 def _cached(path: Path, overwrite: bool, build: Callable[[], Path]) -> Path:
@@ -184,6 +185,25 @@ def process_basin(basin_id: str, geometry_wkb: bytes, settings_path: Optional[st
                                            model_cfg=settings.model, overwrite=overwrite)
             if qc:
                 _qc(lambda: plot_model_figures(model_dir, overwrite=overwrite))
+        if "run" in steps:
+            from .sfincs_run import run_sfincs
+            run_sfincs(settings.model_dir(basin_id), settings.section("run"),
+                       overwrite=overwrite)
+        if "postprocess" in steps:
+            from .postprocess import postprocess_run
+            post = settings.section("postprocess")
+            rp = settings.model.get("design_return_period", 100)
+            model_dir, out_dir = settings.model_dir(basin_id), settings.output_dir(basin_id)
+            files = postprocess_run(model_dir, out_dir, return_period=rp,
+                                    hmin=post.get("hmin", 0.10),
+                                    depth_classes=post.get("depth_classes", [0.1, 0.3, 0.5, 1, 2]),
+                                    overwrite=overwrite)
+            fig = out_dir / "figures" / f"flood_depth_rp{rp}.png"
+            stale = not fig.exists() or fig.stat().st_mtime < files["summary"].stat().st_mtime
+            if qc and (overwrite or stale):
+                _qc(lambda: plot_flood_map(files["hmax"], files["summary"],
+                                           model_dir / "subgrid" / "dep_subgrid.tif",
+                                           model_dir / "region.geojson", fig))
     except Exception as exc:
         result.update(status="failed", error=f"{type(exc).__name__}: {exc}")
         log.error("basin %s failed:\n%s", basin_id, traceback.format_exc())

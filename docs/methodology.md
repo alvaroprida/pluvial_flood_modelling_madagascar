@@ -43,6 +43,22 @@ target grid is known.
 - Forcing: the design hyetograph for `model.design_return_period` (100 years by default), applied
   uniformly over the basin, followed by `model.drain_time_h` hours without rain.
 
+## Simulation
+
+SFINCS v2.4.1 (Deltares Docker image, pinned). The rainfall series carries zeros to the end of
+the run: SFINCS does not treat the end of the precipitation file as "no rain", and without the
+zeros the drain period is undefined. Maxima and cumulative rainfall/infiltration are written once,
+over the whole run (`dtmaxout` = run length).
+
+## Post-processing
+
+- The maximum water level of each 50 m cell is projected onto the 25 m subgrid DEM
+  (`hydromt_sfincs.utils.downscale_floodmap`), giving `hmax_rp<T>.tif` (north-up, model UTM CRS).
+- Depths below `postprocess.hmin` (0.10 m) are not counted as flooded.
+- `flood_summary_rp<T>.json` reports flooded area per depth class, depth statistics, flooded
+  volume, and the water balance (basin-mean rainfall, infiltration, runoff coefficient). The
+  rainfall total equals the design depth, which is a check that the forcing was applied in full.
+
 ## Assumptions and limitations
 
 - **The depth-duration exponent n is uncalibrated.** It sets the peak intensity, and so the
@@ -64,6 +80,8 @@ Every basin gets QC figures (switch off with `qc_figures: false`):
   groups, design rainfall), each with the basin outline and the distribution inside the basin.
 - `models/<id>/figures/model_overview.png`: active mask and outflow boundary, subgrid
   elevation, infiltration capacity, and the rainfall forcing over the whole run.
+- `outputs/<id>/figures/flood_depth_rp<T>.png`: maximum flood depth over a hillshade, and
+  flooded area per depth class with the water balance.
 
 ## Validation
 

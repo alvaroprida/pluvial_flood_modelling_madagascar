@@ -94,10 +94,12 @@ def test_hyetograph_timeseries_is_a_step_function(tmp_path):
     hyeto = tmp_path / "h.csv"
     pd.DataFrame({"time_h": [0.0, 0.5], "depth_mm": [1.0, 2.0],
                   "intensity_mm_hr": [2.0, 4.0]}).to_csv(hyeto, index=False)
-    end = hyetograph_timeseries(hyeto, tmp_path / "p.csv", pd.Timestamp("2000-01-01"))
+    end = hyetograph_timeseries(hyeto, tmp_path / "p.csv", pd.Timestamp("2000-01-01"),
+                                drain_time_h=2)
     ts = pd.read_csv(tmp_path / "p.csv", index_col=0, parse_dates=True)["precip"]
-    assert end == pd.Timestamp("2000-01-01 01:00")
-    assert list(ts.values) == [2.0, 2.0, 4.0, 4.0, 0.0]
+    assert end == pd.Timestamp("2000-01-01 03:00")          # 1 h of rain + 2 h of drain
+    assert list(ts.values) == [2.0, 2.0, 4.0, 4.0, 0.0, 0.0]
+    assert ts.index[-1] == end                              # forcing covers the whole run
     assert ts.index.is_monotonic_increasing
 
 

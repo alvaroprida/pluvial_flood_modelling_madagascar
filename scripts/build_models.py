@@ -1,10 +1,14 @@
-"""Fetch inputs and build SFINCS models for selected basins, in series or in parallel.
+"""Fetch inputs, build, run and post-process SFINCS models for selected basins, in series or in parallel.
 
 Examples
 --------
-Two HydroBASINS catchments, four at a time::
+Two HydroBASINS catchments, all four steps, two at a time::
 
-    python scripts/build_models.py --basin-ids 1061234560_0 1061234570_0 --workers 4
+    python scripts/build_models.py --basin-ids 1071494550_0 1071491870_0 --workers 2
+
+Only (re)run the simulation and post-processing of an existing model::
+
+    python scripts/build_models.py --basin-ids 1071494550_0 --steps run postprocess
 
 Any polygons (e.g. a selection of agricultural or urban catchments), inputs only::
 

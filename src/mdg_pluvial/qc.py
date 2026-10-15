@@ -57,10 +57,17 @@ HSG_LABELS = ["A (high infiltration)", "B (moderate)", "C (slow)", "D (very slow
 
 # ------------------------------------------------------------------- helpers
 def _read(path: Path):
+    """Band 1 as a north-up masked array, with its (left, right, bottom, top) extent.
+
+    HydroMT writes some rasters south-up (positive y resolution); those are flipped here,
+    otherwise maps come out upside down.
+    """
     with rasterio.open(path) as src:
         arr = src.read(1, masked=True)
-        b = src.bounds
-    return arr, (b.left, b.right, b.bottom, b.top)
+        b, south_up = src.bounds, src.transform.e > 0
+    if south_up:
+        arr = arr[::-1]
+    return arr, (b.left, b.right, min(b.bottom, b.top), max(b.bottom, b.top))
 
 
 def _geo_axes(ax, extent, outline: gpd.GeoDataFrame) -> None:
@@ -360,3 +367,68 @@ def plot_model_figures(model_dir: Path, *, overwrite: bool = False) -> Optional[
     path = _save(fig, out)
     log.info("QC figure written: %s", path)
     return path
+
+
+# ------------------------------------------------------------------- results
+def _hillshade(z: np.ndarray, res_m: float) -> np.ndarray:
+    dy, dx = np.gradient(z.astype("float32"), res_m)
+    slope, aspect = np.arctan(np.hypot(dx, dy)), np.arctan2(-dx, dy)
+    return (np.sin(np.radians(45)) * np.cos(slope)
+            + np.cos(np.radians(45)) * np.sin(slope) * np.cos(np.radians(315) - aspect))
+
+
+def plot_flood_map(hmax_tif: Path, summary_json: Path, dem_tif: Path, region_file: Path,
+                   out: Path) -> Path:
+    """Maximum flood depth over a hillshade, and flooded area per depth class."""
+    import json
+
+    summary = json.loads(Path(summary_json).read_text())
+    classes = summary["area_by_depth_km2"]
+    edges = [float(k.split("-")[0].replace(">=", "").replace("m", "").strip())
+             for k in classes]
+    colors = list(plt.get_cmap("Blues")(np.linspace(0.3, 1.0, len(edges))))   # ordinal ramp
+
+    depth, ext = _read(hmax_tif)
+    dem, dem_ext = _read(dem_tif)
+    dem = dem.astype("float32").filled(np.nan)
+    shade = _hillshade(np.nan_to_num(dem, nan=np.nanmin(dem)),
+                       (dem_ext[1] - dem_ext[0]) / dem.shape[1])
+    region = gpd.read_file(region_file)
+    with rasterio.open(hmax_tif) as src:
+        region = region.to_crs(src.crs)
+    km = tuple(v / 1000 for v in ext)
+
+    fig, (ax, axb) = plt.subplots(1, 2, figsize=(14, 6.5), layout="constrained",
+                                  gridspec_kw={"width_ratios": [1.4, 1]})
+    ax.imshow(np.ma.masked_invalid(shade), extent=tuple(v / 1000 for v in dem_ext),
+              cmap="Greys_r", vmin=0, vmax=1)
+    im = ax.imshow(depth, extent=km, cmap=ListedColormap(colors),
+                   norm=BoundaryNorm(edges + [max(edges[-1] * 2, float(depth.max()) + 0.01)],
+                                     len(colors)),
+                   interpolation="nearest")
+    cbar = fig.colorbar(im, ax=ax, shrink=0.8, ticks=edges)
+    cbar.set_label("Maximum flood depth (m)")
+    region.assign(geometry=region.geometry.scale(1e-3, 1e-3, origin=(0, 0))).boundary.plot(
+        ax=ax, color=OUTLINE, linewidth=1.2,
+        path_effects=[patheffects.Stroke(linewidth=3, foreground="white"), patheffects.Normal()])
+    ax.set(xlabel="Easting (km)", ylabel="Northing (km)",
+           title=f"Maximum flood depth, {summary['return_period_years']}-year design storm "
+                 f"(depth ≥ {summary['hmin_m']:g} m)")
+    ax.tick_params(labelsize=8)
+
+    labels, values = list(classes), list(classes.values())
+    y = np.arange(len(labels))[::-1]
+    axb.barh(y, values, color=colors, height=0.7, edgecolor="white", linewidth=2)
+    axb.set_yticks(y, labels)
+    for yi, v in zip(y, values):
+        axb.text(v, yi, f" {v:.2f} km²", va="center", fontsize=9, color=MUTED)
+    axb.set_xlim(0, max(values) * 1.3 if max(values) > 0 else 1)
+    axb.grid(axis="x", color=GRID)
+    axb.set_axisbelow(True)
+    wb = summary["water_balance_mm"]
+    axb.set(xlabel="Flooded area (km²)",
+            title=f"{summary['flooded_area_km2']:.1f} km² flooded "
+                  f"({summary['flooded_share_pct']:.0f}% of basin), max {summary['max_depth_m']:.1f} m\n"
+                  f"rain {wb['rainfall']:.0f} mm, infiltration {wb['infiltration']:.0f} mm, "
+                  f"runoff coefficient {wb['runoff_coefficient']:.2f}")
+    return _save(fig, out)

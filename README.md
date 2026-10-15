@@ -5,14 +5,14 @@ Pluvial (rain-on-grid) flood modelling for Madagascar with
 Each catchment is an independent SFINCS model. Its inputs are downloaded **on the fly**, only for
 the area it covers, from public global datasets. No data is stored in this repository.
 
-> **Status:** input fetching and model setup implemented and tested. Running the models and
-> post-processing the results are the next steps.
+> **Status:** the full chain (inputs, setup, simulation, post-processing) is implemented and
+> tested on single basins. Calibration of the design rainfall is the main open item.
 
 ## How it works
 
 ```
-basin ids or polygons ──► 1. inputs ──► 2. setup ──► (3. run) ──► (4. post-process)
-                          fetch + clip   SFINCS model
+basin ids or polygons ──► 1. inputs ──► 2. setup ──► 3. run ──► 4. postprocess
+                          fetch + clip   SFINCS model   SFINCS     flood depth map
 ```
 
 You choose the basins: HydroBASINS catchments by id, or any polygons (for example, a selection of
@@ -22,6 +22,9 @@ agricultural or urban areas). For each basin, in series or in parallel:
    `data/basins/<basin_id>/`, with a HydroMT data catalogue and a provenance manifest.
 2. **setup**: build the SFINCS model in `models/<basin_id>/` (UTM grid, subgrid topography and
    roughness, curve-number infiltration, design-storm rainfall).
+3. **run**: run SFINCS in Docker (official Deltares image) or with a native executable.
+4. **postprocess**: write the maximum flood depth at 25 m (`outputs/<basin_id>/hmax_rp<T>.tif`)
+   and a summary with flooded area per depth class and the water balance.
 
 Each step also writes QC figures: one per input in `data/basins/<basin_id>/figures/`, and a
 model overview in `models/<basin_id>/figures/model_overview.png`.
@@ -37,6 +40,7 @@ can simply be relaunched.
 ├── data/                Local data (not versioned) - see data/README.md
 ├── docs/                Methodology, data sources and licences
 ├── models/              SFINCS models, one folder per basin (not versioned)
+├── outputs/             Flood depth maps and summaries, one folder per basin (not versioned)
 ├── notebooks/           National-scale exploration and QC
 ├── scripts/             Command-line entry points
 ├── src/mdg_pluvial/     The pipeline, as an importable package
@@ -59,6 +63,12 @@ pip install -e .                 # makes the mdg_pluvial package importable
 Raster I/O goes through `rasterio` (which bundles its own GDAL); the GDAL Python bindings and
 command-line tools are not required. The pipeline runs on macOS and Linux.
 
+The **run** step needs [Docker](https://www.docker.com/) running (Docker Desktop on a Mac). The
+pinned SFINCS image (`deltares/sfincs-cpu:sfincs-v2.4.1`) is pulled on first use. It is published
+for Intel/amd64 only, so on Apple Silicon it runs emulated: about 2 minutes for a 70 km² basin.
+On Linux, `run.engine: executable` in `config/settings.yml` uses a native SFINCS build instead.
+With several workers, set `run.threads` so the models don't compete for the same cores.
+
 ### 2. Local inputs
 
 Two inputs are not downloaded: the HydroBASINS catchments and the GPM daily rainfall cube. Put
@@ -78,7 +88,7 @@ python scripts/build_models.py --basin-ids 1071494550_0 1071491870_0 --workers 2
 python scripts/build_models.py --basins selection.geojson --id-field name --steps inputs
 ```
 
-Options: `--steps inputs setup` (default both), `--workers N` (default 1 = in series),
+Options: `--steps inputs setup run postprocess` (default: all four), `--workers N` (default 1 = in series),
 `--overwrite` (rebuild existing outputs), `--config other_settings.yml`.
 
 Failures don't stop the batch. The command reports which basins failed, and each basin's
@@ -108,7 +118,7 @@ Details and citations: [docs/data_sources.md](docs/data_sources.md).
 - FABDEM's non-commercial licence must be checked against the intended use of the results.
 - The rainfall record is daily. The design hyetographs rely on an uncalibrated sub-daily
   disaggregation exponent. See [docs/methodology.md](docs/methodology.md).
-- The model setup has been tested; the models have not been run yet.
+- Results have not been validated against observed flooding yet.
 
 ## Licence
 

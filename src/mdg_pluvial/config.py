@@ -18,6 +18,7 @@ _PATH_OVERRIDES = {
     ("paths", "cache_dir"): "MDG_CACHE_DIR",
     ("paths", "basins_dir"): "MDG_BASINS_DIR",
     ("paths", "models_dir"): "MDG_MODELS_DIR",
+    ("paths", "outputs_dir"): "MDG_OUTPUTS_DIR",
     ("local_inputs", "hydrobasins"): "MDG_HYDROBASINS",
     ("local_inputs", "gpm_daily"): "MDG_GPM_DAILY",
 }
@@ -33,6 +34,7 @@ class Settings:
     cache_dir: Path
     basins_dir: Path
     models_dir: Path
+    outputs_dir: Path
     hydrobasins: Path
     gpm_daily: Path
 
@@ -64,6 +66,9 @@ class Settings:
 
     def model_dir(self, basin_id: str) -> Path:
         return self.models_dir / basin_id
+
+    def output_dir(self, basin_id: str) -> Path:
+        return self.outputs_dir / basin_id
 
 
 def _resolve(value: str) -> Path:
